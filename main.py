@@ -1,5 +1,5 @@
 import argparse
-from utils import (
+from csv_processor.utils import (
     read_csv,
     apply_aggregation,
     apply_filter,
@@ -45,7 +45,6 @@ def main():
     args = parse_args()
     try:
         data = read_csv(args.file)
-
         if args.where:
             data = apply_filter(data, args.where)
 

@@ -1,7 +1,7 @@
 import csv
 from typing import List, Dict, Any, Tuple, Union
 from tabulate import tabulate
-from exceptions import (
+from csv_processor.exceptions import (
     InvalidFilterFormatException,
     InvalidSortFormatException,
     InvalidAggregationFormatException,
@@ -16,13 +16,23 @@ def read_csv(file_path: str) -> List[Dict[str, Any]]:
 
 
 def parse_filter(filter_str: str) -> Tuple[str, str, str]:
-    operators = ['==', '!=', '<', '>', '<=', '>=']
-
+    operators = ['==', '!=', '<=', '>=', '<', '>']
     for op in operators:
         if op in filter_str:
             key, value = filter_str.split(op, 1)
             key = key.strip()
+            if not key:
+                raise InvalidFilterFormatException(
+                    f'Missing filter column in: {filter_str}'
+                )
             value = value.strip().strip('"').strip("'")
+
+            # Prevent multiple operators in key/value (e.g., "price==4>3")
+            if any(op2 in key or op2 in value for op2 in operators):
+                raise InvalidFilterFormatException(
+                    f"Invalid filter format: {filter_str}"
+                )
+
             return key, op, value
 
     raise InvalidFilterFormatException(f"Invalid filter format: {filter_str}")
@@ -34,6 +44,10 @@ def parse_sort(sort_str: str) -> Tuple[str, str]:
     key, order = sort_str.split('=', 1)
     key = key.strip()
     order = order.strip().lower()
+    if not key:
+        raise InvalidSortFormatException(
+            f'Missing sort column in: {sort_str}'
+        )
     if order not in ['asc', 'desc']:
         raise InvalidSortFormatException(f"Invalid sort order: {order}")
     return key, order
@@ -47,6 +61,10 @@ def parse_aggregation(agg_str: str) -> Tuple[str, str]:
     column, operation = agg_str.split('=', 1)
     column = column.strip()
     operation = operation.strip().lower()
+    if not column:
+        raise InvalidAggregationFormatException(
+            f"Missing aggregation column in: {agg_str}"
+        )
     if operation not in ['sum', 'avg', 'count', 'min', 'max']:
         raise InvalidAggregationFormatException(
             f"Invalid aggregation function: {operation}"
@@ -93,7 +111,15 @@ def apply_sort(
         sort_str: str) -> List[Dict[str, Any]]:
     column, order = parse_sort(sort_str)
     reverse = order == 'desc'
-    return sorted(data, key=lambda x: try_convert(x[column]), reverse=reverse)
+    try:
+        sorted_data = sorted(
+            data, key=lambda x: try_convert(x[column]), reverse=reverse
+        )
+        return sorted_data
+    except KeyError:
+        raise InvalidSortFormatException(
+            f"Column '{column}' not found for sorting"
+        )
 
 
 def apply_aggregation(
